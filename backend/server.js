@@ -10,23 +10,33 @@ const bcrypt = require("bcrypt");
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({ credentials: true, origin: 'http://localhost:3000' }));
-mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/Template")
-.then(() => {
-  console.log("Connected to MongoDB");
-})
-.catch((error) => {
-  console.error("Error connecting to MongoDB:", error);
-});
+mongoose
+  .connect(
+    process.env.MONGODB_URI ||
+      "mongodb+srv://dpdp8311:dpdp8311@cluster0.5ysqydm.mongodb.net/Template"
+  )
+  .then(() => {
+    console.log("Connected to MongoDB");
+  })
+  .catch((error) => {
+    console.error("Error connecting to MongoDB:", error);
+  });
 const UserSchema= new mongoose.Schema({
   name: String,
   email: String,
   password: String,
 });
+const MenuSchema = new mongoose.Schema({
+  path: String,
+  name: String,
+  icon: String,
+  layout: String,
+  enabled: { type: Boolean, default: true }
+});
 const Users = mongoose.model("Users", UserSchema);
+const Menus = mongoose.model("Menus", MenuSchema);
 
 
-
-// app.get('/getmenus', (req,res))
 
 const authenticateToken = (req, res, next) => {
   const token = req.cookies.token;
@@ -43,6 +53,70 @@ const authenticateToken = (req, res, next) => {
     next();
   });
 };
+
+app.get("/menus", authenticateToken, async (req, res) => {
+  try {
+    const menus = await Menus.find({ enabled: true });
+    res.json(menus);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching menus", error: error.message });
+  }
+});
+
+app.get("/all-menus", authenticateToken, async (req, res) => {
+  try {
+    const menus = await Menus.find({});
+    res.json(menus);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching menus", error: error.message });
+  }
+});
+
+app.put("/toggle-menu/:id", authenticateToken, async (req, res) => {
+  try {
+    const menu = await Menus.findById(req.params.id);
+    if (!menu) {
+      return res.status(404).json({ message: "Menu not found" });
+    }
+    menu.enabled = !menu.enabled;
+    await menu.save();
+    res.json({ message: "Menu status updated", enabled: menu.enabled });
+  } catch (error) {
+    res.status(500).json({ message: "Error updating menu", error: error.message });
+  }
+});
+
+app.get("/menunames", authenticateToken, async (req, res) => {
+  try {
+    const menus = await Menus.find({}).select('name -_id');
+    res.json(menus);
+  }
+  catch (error) {
+    res.status(500).json({ message: "Error fetching menus", error: error.message });
+  }
+});
+
+app.post("/add-menu",  async (req, res) => {
+  try {
+    const existingMenu = await Menus.findOne({ path: "/menus" });
+    if (!existingMenu) {
+      await Menus.create({
+        path: "/menus",
+        name: "Menus",
+        icon: "nc-icon nc-bullet-list-67",
+        layout: "/admin"
+      });
+      res.json({ message: "Menus option added successfully" });
+    } else {
+      res.json({ message: "Menus option already exists" });
+    }
+  } catch (error) {
+    res.status(500).json({ message: "Error adding menu", error: error.message });
+  }
+});
+
+
+
 
 app.get("/", (req, res) => {
   res.send("Hello World!");
